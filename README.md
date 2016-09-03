@@ -8,7 +8,8 @@ Usage
 Use this to communicate with pwhois servers.
 
 Some examples of usage:
-    from pwhois import pwhois <br />
+
+    from pwhois.core import pwhois <br />
 
     test1 = pwhois.lookup("4.2.2.2") <br />
     print(test1) <br />
