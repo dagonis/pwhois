@@ -9,8 +9,10 @@ import socket
 import time
 import re
 
+pw_server = 'whois.pwhois.org'
+pw_port = 43
 
-class pwhois(object):
+class ip(object):
     """This is the data returned by a pwhois lookup, format is modeled after the output of whob"""
 
     def __init__(self, ip="", origin_as="", prefix="", as_path="", as_org_name="", org_name="", net_name="",
@@ -52,9 +54,7 @@ Country-Code: {}""".format(self.ip, self.origin_as, self.prefix, self.as_path, s
     @classmethod
     def lookup(cls, query):
         """Single query, takes a single IP (represented as a string) and returns a pwhois_obj."""
-        if pwhois.ip_check(query):
-            pw_server = 'whois.pwhois.org'
-            pw_port = 43
+        if ip_check(query):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((pw_server, pw_port))
             query_bytes = (query + "\r\n").encode()
@@ -62,7 +62,7 @@ Country-Code: {}""".format(self.ip, self.origin_as, self.prefix, self.as_path, s
             resp = s.recv(500)
             whois_data = resp.split('\n')
             try:
-                return pwhois(whois_data[0].split(': ')[1], whois_data[1].split(': ')[1],
+                return ip(whois_data[0].split(': ')[1], whois_data[1].split(': ')[1],
                               whois_data[2].split(': ')[1],
                               whois_data[3].split(': ')[1], whois_data[4].split(': ')[1],
                               whois_data[5].split(': ')[1],
@@ -77,7 +77,7 @@ Country-Code: {}""".format(self.ip, self.origin_as, self.prefix, self.as_path, s
             return "Input {} is invalid".format(query)
 
     @classmethod
-    def bulk_lookup(cls, query, verbose=False):
+    def bulk_lookup(cls, query, verbosity=False):
         """Bulk lookup, takes a list of IPs and returns a dictionary of results. Use 'v' to turn on verbose mode
         and get back a list of invalid IPs in a query."""
         q_set = set()
@@ -87,7 +87,7 @@ Country-Code: {}""".format(self.ip, self.origin_as, self.prefix, self.as_path, s
         p_obj_dict = {}
         response = ""
         for ip in query:
-            if pwhois.ip_check(ip):
+            if ip_check(ip):
                 q_set.add(ip)
             else:
                 bad_set.add(ip)
@@ -110,7 +110,7 @@ Country-Code: {}""".format(self.ip, self.origin_as, self.prefix, self.as_path, s
             whois_data = entry.split('\n')
             if whois_data[1].split(': ')[1] == 'NULL':
                 #Null results don't return a country code, so they need to be handled separately
-                p_obj = pwhois(whois_data[0].split(': ')[1], whois_data[1].split(': ')[1],
+                p_obj = ip(whois_data[0].split(': ')[1], whois_data[1].split(': ')[1],
                                   whois_data[2].split(': ')[1],
                                   whois_data[3].split(': ')[1], whois_data[4].split(': ')[1],
                                   whois_data[5].split(': ')[1],
@@ -122,7 +122,7 @@ Country-Code: {}""".format(self.ip, self.origin_as, self.prefix, self.as_path, s
                 p_obj_dict[whois_data[0].split(': ')[1]] = p_obj
             else:
                 try:
-                    p_obj = pwhois(whois_data[0].split(': ')[1], whois_data[1].split(': ')[1],
+                    p_obj = ip(whois_data[0].split(': ')[1], whois_data[1].split(': ')[1],
                                       whois_data[2].split(': ')[1],
                                       whois_data[3].split(': ')[1], whois_data[4].split(': ')[1],
                                       whois_data[5].split(': ')[1],
@@ -134,16 +134,47 @@ Country-Code: {}""".format(self.ip, self.origin_as, self.prefix, self.as_path, s
                     p_obj_dict[whois_data[0].split(': ')[1]] = p_obj
                 except:
                     pass
-        if verbose:
+        if verbosity == True:
             return p_obj_dict, list(bad_set)
         else:
             return p_obj_dict
 
-    @staticmethod
-    def ip_check(ip):
-        ip_reg = re.compile(
-            '(?:^(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})$)')
-        if ip_reg.match(ip):
-            return True
-        else:
-            return False
+
+class asn(object):
+    def __init__(self, asn, ranges):
+        self.asn = asn
+        self.ranges = ranges
+
+    @classmethod
+    def lookup(cls, as_n):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((pw_server, pw_port))
+        query_bytes = 'app="Python pwhois client" routeview source-as={}\r\n'.format(as_n).encode()
+        s.send(query_bytes)
+        resp = recvall(s)
+        range_output = resp.split("\n")[2:-1]
+        ranges = set()
+        for range in range_output:
+            ranges.add(range.lstrip("*> ").split(" ")[0])
+        return asn(as_n, ranges)
+
+    def __str__(self):
+        return "ASN {}\nRanges:\n{}".format(self.asn, "\n".join([r for r in self.ranges]))
+
+
+def ip_check(ip):
+    ip_reg = re.compile(
+        '(?:^(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})$)')
+    if ip_reg.match(ip):
+        return True
+    else:
+        return False
+
+
+def recvall(sock):
+    data = ""
+    part = None
+    while part != "":
+        part = sock.recv(4096)
+        data += part
+    return data

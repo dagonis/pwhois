@@ -1,3 +1,2 @@
-__all__ = ['core']
-
 from core import *
+__all__ = ['core']
