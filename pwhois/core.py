@@ -143,7 +143,7 @@ Country-Code: {}""".format(self.ip, self.origin_as, self.prefix, self.as_path, s
 class asn(object):
     def __init__(self, asn, ranges):
         self.asn = asn
-        self.ranges = ranges
+        self.ranges = list(ranges)
 
     @classmethod
     def lookup(cls, as_n):
